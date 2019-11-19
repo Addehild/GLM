@@ -1,0 +1,299 @@
+\documentclass{article}
+
+\begin{document}
+\section{Start}
+<<>>==
+library(tidyverse)
+# Setting seed for reprocibility
+set.seed(1)
+# Get the data
+data <- read_csv("AssignmentOne.csv")
+
+
+
+attach(data)
+@
+
+\section{Functions}
+\subsection{Function with fixed PHI}
+<<>>== 
+Function.GLM <- function(y, x, tol){
+n <- nrow(x)  
+  # Assign the starting values for the matrices
+Xmat <- cbind(1, x)
+p <- ncol(Xmat)
+Beta.Old <- matrix( 0, nrow=p , ncol=1 )
+Dmat.Old <- diag( c(exp(Xmat%*%Beta.Old)) )
+Vmat.Old <- Dmat.Old^2
+Wmat.Old <- Dmat.Old%*%diag(diag(solve(Vmat.Old)))%*%Dmat.Old
+Mu.Old <- matrix( exp(Xmat%*%Beta.Old), ncol=1 )
+Z.Old <- Xmat%*%Beta.Old + diag(diag(solve(Dmat.Old)))%*%( y - Mu.Old )
+
+# Run the IRLS
+curr.diff <- 1
+while(curr.diff >= tol ){
+  
+  Beta.Upd <- solve(t(Xmat)%*%Wmat.Old%*%Xmat)%*%t(Xmat)%*%Wmat.Old%*%Z.Old
+  curr.diff <- max( abs(Beta.Upd-Beta.Old) )
+  Beta.Old <- Beta.Upd
+  Dmat.Old <- diag( c(exp(Xmat%*%Beta.Old)) )
+  Vmat.Old <- Dmat.Old^2
+  Wmat.Old <- Dmat.Old%*%diag(diag(solve(Vmat.Old)))%*%Dmat.Old
+  Mu.Old <- matrix(exp(Xmat%*%Beta.Old), ncol = 1)
+  Z.Old <- Xmat%*%Beta.Old + diag(diag(solve(Dmat.Old)))%*%(y - Mu.Old)
+}
+
+Se.Mat <- solve(t(Xmat)%*%Wmat.Old%*%Xmat)
+Se.Mat.Up <- as.matrix(sqrt(diag(Se.Mat)))
+
+Estimates <- cbind(Beta.Old, Se.Mat.Up)
+colnames(Estimates) <- c("Estimate", "Std. Error")
+print(Estimates)
+
+y.vec <-  exp(Xmat%*%Beta.Old)
+theta.vec <- -1 * (1/y.vec) 
+b.theta <- -1* log( - theta.vec) 
+
+log.lik <- sum((y.vec * theta.vec) - b.theta)
+
+y.vec * theta.vec 
+aic <- -2*log.lik + 2 *6
+bic <- -2 * log.lik + log(nrow(Beta.Old))*6
+
+model.mesurements <- cbind(aic, bic)
+colnames(model.mesurements) <- c("AIC", "BIC")
+## AIC and BIC
+print(model.mesurements) 
+## Residual Deviance
+theta.vec2 <- -1 * (1/y)
+b.theta2 <- -1* log( - theta.vec2) 
+
+model.saturated <- sum((y * theta.vec2) - b.theta2) 
+model.of.interest <- sum((y.vec * theta.vec) - b.theta) 
+
+
+cat("\nResidual deviance", -2*( model.of.interest - model.saturated), "\nDF:", (n - p) )
+
+## Null model 
+
+Xmat <- matrix(1, n)
+p <- ncol(Xmat)
+Beta.Old <- matrix( 0, nrow=1 , ncol=1 )
+Dmat.Old <- diag( c(exp(Xmat%*%Beta.Old)) )
+Vmat.Old <- Dmat.Old^2
+Wmat.Old <- Dmat.Old%*%diag(diag(solve(Vmat.Old)))%*%Dmat.Old
+Mu.Old <- matrix( exp(Xmat%*%Beta.Old), ncol=1 )
+Z.Old <- Xmat%*%Beta.Old + diag(diag(solve(Dmat.Old)))%*%( y - Mu.Old )
+
+# Run the IRLS
+curr.diff <- 1
+while(curr.diff >= tol ){
+  Beta.Upd <- solve(t(Xmat)%*%Wmat.Old%*%Xmat)%*%t(Xmat)%*%Wmat.Old%*%Z.Old
+  curr.diff <- max( abs(Beta.Upd-Beta.Old) )
+  Beta.Old <- Beta.Upd
+  Dmat.Old <- diag( c(exp(Xmat%*%Beta.Old)) )
+  Vmat.Old <- Dmat.Old^2
+  Wmat.Old <- Dmat.Old%*%diag(diag(solve(Vmat.Old)))%*%Dmat.Old
+  Mu.Old <- matrix(exp(Xmat%*%Beta.Old), ncol = 1)
+  Z.Old <- Xmat%*%Beta.Old + diag(diag(solve(Dmat.Old)))%*%(y - Mu.Old)
+}
+
+y.vec <-  exp(Xmat%*%Beta.Old)
+theta.vec <- -1 * (1/y.vec) 
+b.theta <- -1* log( - theta.vec) 
+
+theta.vec2 <- -1 * (1/y)
+b.theta2 <- -1* log( - theta.vec2) 
+
+## Null deviance
+model.saturated <- sum((y * theta.vec2) - b.theta2) 
+model.of.interest <- sum((y.vec * theta.vec) - b.theta) 
+
+cat("\nNull deviance", -2*( model.of.interest - model.saturated), "\nDF:", n - p)
+
+}
+@
+
+\subsection{Function with dispersion parameter - quasi-maximum likelihood}
+<<>>==
+Function.GLM.dispersion <- function(y, x, tol, phi){
+  n <- nrow(x)  
+  # Assign the starting values for the matrices
+  Xmat <- cbind(1, x)
+  p <- ncol(Xmat)
+  Beta.Old <- matrix( 0, nrow=p , ncol=1 )
+  Dmat.Old <- diag( c(exp(Xmat%*%Beta.Old)) )
+  Vmat.Old <- Dmat.Old^2
+  Wmat.Old <- Dmat.Old%*%diag(diag(solve(Vmat.Old)))%*%Dmat.Old
+  Mu.Old <- matrix( exp(Xmat%*%Beta.Old), ncol=1 )
+  Z.Old <- Xmat%*%Beta.Old + diag(diag(solve(Dmat.Old)))%*%( y - Mu.Old )
+  
+  # Run the IRLS
+  curr.diff <- 1
+  
+  while(curr.diff >= tol ){
+    Beta.Upd <- solve(t(Xmat)%*%Wmat.Old%*%Xmat)%*%t(Xmat)%*%Wmat.Old%*%Z.Old
+    curr.diff <-max( abs(Beta.Upd-Beta.Old) )
+    Beta.Old <- Beta.Upd
+    Dmat.Old <- diag( c(exp(Xmat%*%Beta.Old)) )
+    Vmat.Old <- Dmat.Old^2
+    Wmat.Old <- Dmat.Old%*%diag(diag(solve(Vmat.Old)))%*%Dmat.Old
+    Mu.Old <- matrix(exp(Xmat%*%Beta.Old), ncol = 1)
+    Z.Old <- Xmat%*%Beta.Old + diag(diag(solve(Dmat.Old)))%*%(y - Mu.Old)
+  }
+  
+  Dispersion.parameter <- sum((y - Mu.Old )^2 / diag(Vmat.Old))/ (n - p)
+  
+  Xmat <- cbind(1, x)
+  p <- ncol(Xmat)
+  Beta.Old <- matrix( 0, nrow=p , ncol=1 )
+  Dmat.Old <- diag( c(exp(Xmat%*%Beta.Old)) )
+  Vmat.Old <- Dmat.Old^2
+  Wmat.Old <- Dmat.Old%*%diag(diag(solve(Vmat.Old)))%*%Dmat.Old
+  Mu.Old <- matrix( exp(Xmat%*%Beta.Old), ncol=1 )
+  Z.Old <- Xmat%*%Beta.Old + diag(diag(solve(Dmat.Old)))%*%( y - Mu.Old )
+  
+  curr.diff <- 1
+  
+  while(curr.diff >= tol ){
+    Beta.Upd <- solve(t(Xmat)%*%Wmat.Old%*%Xmat)%*%t(Xmat)%*%Wmat.Old%*%Z.Old
+    curr.diff <- max( abs(Beta.Upd-Beta.Old) )
+    Beta.Old <- Beta.Upd
+    Dmat.Old <- diag( c(exp(Xmat%*%Beta.Old)) )
+    Vmat.Old <- 1/(Dispersion.parameter) * (Dmat.Old^2)
+    Wmat.Old <- Dmat.Old%*%diag(diag(solve(Vmat.Old)))%*%Dmat.Old
+    Mu.Old <- matrix(exp(Xmat%*%Beta.Old), ncol = 1)
+    Z.Old <- Xmat%*%Beta.Old + diag(diag(solve(Dmat.Old)))%*%(y - Mu.Old)
+  }
+  
+  Se.Mat <- solve(t(Xmat)%*%Wmat.Old%*%Xmat)
+  Se.Mat.Up <- as.matrix(sqrt(diag(Se.Mat)))
+  
+  Estimates <- cbind(Beta.Old, Se.Mat.Up)
+  colnames(Estimates) <- c("Estimate", "Std. Error")
+  print(Estimates)
+  cat("\n Dispersion Parameter:", Dispersion.parameter, "\n")
+  
+  y.vec <-  exp(Xmat%*%Beta.Old)
+  theta.vec <- -1 * (1/y.vec) 
+  b.theta <- -1* log( - theta.vec) 
+  
+  log.lik <- sum((y.vec * theta.vec) - b.theta)
+  
+  y.vec * theta.vec 
+  aic <- -2*log.lik + 2 *6
+  bic <- -2 * log.lik + log(nrow(Beta.Old))*6
+  
+  model.mesurements <- cbind(aic, bic)
+  colnames(model.mesurements) <- c("AIC", "BIC")
+  ## AIC and BIC
+  print(model.mesurements) 
+  ## Residual Deviance
+  theta.vec2 <- -1 * (1/y)
+  b.theta2 <- -1* log( - theta.vec2) 
+  
+  model.saturated <- sum((y * theta.vec2) - b.theta2) 
+  model.of.interest <- sum((y.vec * theta.vec) - b.theta) 
+  
+  
+  cat("\nResidual deviance", -2*( model.of.interest - model.saturated), "\nDF:", (n - p) )
+  
+  ## Null model 
+  
+  Xmat <- matrix(1, n)
+  p <- ncol(Xmat)
+  Beta.Old <- matrix( 0, nrow=1 , ncol=1 )
+  Dmat.Old <- diag( c(exp(Xmat%*%Beta.Old)) )
+  Vmat.Old <- Dmat.Old^2
+  Wmat.Old <- Dmat.Old%*%diag(diag(solve(Vmat.Old)))%*%Dmat.Old
+  Mu.Old <- matrix( exp(Xmat%*%Beta.Old), ncol=1 )
+  Z.Old <- Xmat%*%Beta.Old + diag(diag(solve(Dmat.Old)))%*%( y - Mu.Old )
+  
+  # Run the IRLS
+  curr.diff <- 1
+  while(curr.diff >= tol ){
+    Dispersion.parameter <- sum((y - Mu.Old )^2 / diag(Vmat.Old))/ n-p
+    Beta.Upd <- solve(t(Xmat)%*%Wmat.Old%*%Xmat)%*%t(Xmat)%*%Wmat.Old%*%Z.Old
+    curr.diff <- max( abs(Beta.Upd-Beta.Old) )
+    Beta.Old <- Beta.Upd
+    Dmat.Old <- diag( c(exp(Xmat%*%Beta.Old)) )
+    Vmat.Old <- (1/(Dispersion.parameter)) * (Dmat.Old^2)
+    Wmat.Old <- Dmat.Old%*%diag(diag(solve(Vmat.Old)))%*%Dmat.Old
+    Mu.Old <- matrix(exp(Xmat%*%Beta.Old), ncol = 1)
+    Z.Old <- Xmat%*%Beta.Old + diag(diag(solve(Dmat.Old)))%*%(y - Mu.Old)
+  }
+  
+  y.vec <-  exp(Xmat%*%Beta.Old)
+  theta.vec <- -1 * (1/y.vec) 
+  b.theta <- -1* log( - theta.vec) 
+  
+  theta.vec2 <- -1 * (1/y)
+  b.theta2 <- -1* log( - theta.vec2) 
+  
+  ## Null deviance
+  model.saturated <- sum((y * theta.vec2) - b.theta2) 
+  model.of.interest <- sum((y.vec * theta.vec) - b.theta) 
+  
+  cat("\nNull deviance", -2*( model.of.interest - model.saturated), "\nDF:", n - p)
+  
+}
+@
+
+\section{Question 1}
+
+<<>>== 
+Function.GLM(y, cbind(x1,x2,x3, x4, x5), tol=1e-06)
+@
+
+\section{Question 2}
+<<>>==
+## Confidence interval
+Xmat <- cbind(1, x1, x2, x3, x4, x5)
+Beta.Old <- matrix( 0, nrow=6, ncol=1 )
+Dmat.Old <- diag( c(exp(Xmat%*%Beta.Old)) )
+Vmat.Old <- Dmat.Old^2
+Wmat.Old <- Dmat.Old%*%diag(diag(solve(Vmat.Old)))%*%Dmat.Old
+Mu.Old <- matrix( exp(Xmat%*%Beta.Old), ncol=1 )
+Z.Old <- Xmat%*%Beta.Old + diag(diag(solve(Dmat.Old)))%*%( y - Mu.Old )
+
+# Run the IRLS
+Tol <- 1
+while( Tol>=1e-06 ){
+  
+  Beta.Upd <- solve(t(Xmat)%*%Wmat.Old%*%Xmat)%*%t(Xmat)%*%Wmat.Old%*%Z.Old
+  Tol <- max( abs(Beta.Upd-Beta.Old) )
+  
+  Beta.Old <- Beta.Upd
+  Dmat.Old <- diag( c(exp(Xmat%*%Beta.Old)) )
+  Vmat.Old <- Dmat.Old^2
+  Wmat.Old <- Dmat.Old%*%diag(diag(solve(Vmat.Old)))%*%Dmat.Old
+  Mu.Old <- matrix(exp(Xmat%*%Beta.Old), ncol = 1)
+  Z.Old <- Xmat%*%Beta.Old + diag(diag(solve(Dmat.Old)))%*%(y - Mu.Old)
+}
+
+
+
+Se.Mat <- solve(t(Xmat)%*%Wmat.Old%*%Xmat)
+
+Se.Mat.Eta <- Xmat%*%Se.Mat%*%t(Xmat)
+
+Se.Mat.Mu <- Dmat.Old%*%Se.Mat.Eta%*%t(Dmat.Old)
+
+lowerbound.Mu <- exp( Xmat%*%Beta.Old ) - qnorm(0.975)*sqrt( diag(Se.Mat.Mu) )
+upperbound.Mu <- exp( Xmat%*%Beta.Old ) + qnorm(0.975)*sqrt( diag(Se.Mat.Mu) )
+
+conf.intervals <- cbind(lowerbound.Mu, upperbound.Mu)
+conf.intervals[1:2,]
+
+@
+\section{Question 3}
+
+<<>>== 
+Function.GLM(y, cbind(x1,x2,x3), tol=1e-06)
+@
+
+\section{Question 4}
+<<>>==
+Function.GLM.dispersion(y, cbind(x1,x2,x3), tol=1e-06)
+@
+\end{document}
