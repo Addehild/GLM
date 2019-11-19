@@ -2,15 +2,12 @@
 
 \begin{document}
 \section{Start}
-<<>>==
+<<message=FALSE, warning=FALSE>>==
 library(tidyverse)
 # Setting seed for reprocibility
 set.seed(1)
 # Get the data
 data <- read_csv("AssignmentOne.csv")
-
-
-
 attach(data)
 @
 
@@ -240,10 +237,13 @@ Function.GLM.dispersion <- function(y, x, tol, phi){
 @
 
 \section{Question 1}
+The function below outputs the standard error of the regression coeffcients, null deviance, residual deviance, AIC and BIC. In addition, the degress of freedom for the null deviance and residual deviance are provided by the function. 
 
 <<>>== 
 Function.GLM(y, cbind(x1,x2,x3, x4, x5), tol=1e-06)
 @
+
+
 
 \section{Question 2}
 <<>>==
@@ -296,4 +296,31 @@ Function.GLM(y, cbind(x1,x2,x3), tol=1e-06)
 <<>>==
 Function.GLM.dispersion(y, cbind(x1,x2,x3), tol=1e-06)
 @
+
+We see the the dispersion parameter is 0.9584342. We see that the only aspects that have changed with the dispersion parameter set with quasi-maximum likelihood is the standard error for the coefficients.  
+
+\begin{center}
+ \begin{tabular}{||c c c c||} 
+ \hline
+ Initial model & & Dispersion model & \\ [0.5ex]
+ \hline
+ Est & Std. Err & Est & Std. Err \\ [0.5ex] 
+ \hline\hline
+ 0.6902 & 0.0716 & 0.6902 & 0.0731 \\ 
+ \hline
+ -0.5391 & 0.0899 & -0.5391 & 0.0918 \\
+ \hline
+ 0.2213 & 0.0894 & 0.2212 & 0.0913 \\
+ \hline
+ -0.4746 & 0.0911 & -0.4746 & 0.0931 \\
+ \hline
+\end{tabular}
+\end{center}
+\\
+In order verify that the tabulated data is correct we call:
+<<>>== 
+Function.GLM(y, cbind(x1,x2,x3), tol=1e-06)
+@
+
+
 \end{document}
